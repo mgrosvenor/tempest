@@ -1,5 +1,5 @@
-% Tempest Version 0.1 | A really ridiculously stupidly simple template engine. 
- 
+% Tempest Version 0.1 | A really ridiculously stupidly simple template engine.
+
 NAME
 ====
 
@@ -8,25 +8,24 @@ NAME
 SYNOPSIS
 ========
 
-| **tempest** template [-D DEFS]  [-i INCLS] [-I INCL_DIRS] [-o OUT] [-h]
+| **tempest** TEMPLATE [-D DEFS]  [-i INCLS] [-I INCL_DIRS] [-o OUT] [-h]
 
 DESCRIPTION
 ===========
 
 Tempest is a really ridiculously stupidly simple template engine.
-It is designed to make it easy to build complext text files using simple templates. 
-Tempest templates have only two options 1) replace a string or 2) insert a file contents. 
-Data for populating the templates is supplied in a simple flat JSON file and/or command line arguments. 
+It is designed to make it easy to build complex text files using simple templates.
+Tempest templates have only two options 1) replace a string or 2) insert a file contents.
+Data for populating the templates is supplied in a simple flat JSON file and/or command line arguments.
 
 Options
 -------
-Tempest is designed to have familiar arguments to C compiler (e.g. GCC, CLANG). 
-This shuold make it easy to integrate into Makefile environments. 
+Tempest is designed to have familiar arguments to C compiler (e.g. GCC, CLANG).
+This should make it easy to integrate into Makefile environments.
 
+TEMPLATE
 
-temp
-
-:    Template file to peform replacements on
+:    Template file to perform replacements on. 
 
 -h, --help
 
@@ -35,22 +34,18 @@ temp
 -D DEFS
 
 :   Manual definitions in the form "name=value"
-  
+
 -i INCLS      
 
-:     One or more JSON dictoaries defining insertions/replacements map
-
+:     One or more JSON dictionaries defining insertions/replacements map
 
 -I INCL_DIRS  
 
-:    Direcotry to look in for inclusion files 
-
+:    Directory to look in for inclusion files
 
 -o OUT
 
 :   Outputs the result to the given filename.
-
-    The file must be an **open(2)**able and **write(2)**able file.
 
 -v, --version
 
@@ -61,7 +56,7 @@ USAGE
 ## String replacement
 String replacement is performed using the `$$` special symbol. For example
 ```
-My name is $$name 
+My name is $$name
 ```
 With the command line option
 ```
@@ -74,12 +69,12 @@ Or with the JOSN file
 }
 ```
 
-The `$$` literal can be escaped using `$$$$`. 
+The `$$` literal can be escaped using `$$$$`.
 
-If the subsitution pattern is contined in another string (e.g. "$names") then the escaped pattern `${name}` may be used instead. 
+If the substitution pattern is contained in another string (e.g. "$names") then the escaped pattern `${name}` may be used instead.
 
 ## File Insertion
-File insetion is performed using the `##` special symbol. For example
+File insertion is performed using the `##` special symbol. For example
 ```
 ##config
 ```
@@ -101,15 +96,4 @@ See GitHub Issues: <https://github.com/mgrosvenor/tempest/issues>
 
 AUTHOR
 ======
-Copyright (C) 2019 Matthew P. Grovenor 
-
-
-
-
-
-
-
-
-
-
-
+Copyright (C) 2019 Matthew P. Grosvenor
