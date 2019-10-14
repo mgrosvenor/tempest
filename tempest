@@ -6,6 +6,8 @@
 Tempest is a really ridiculously stupidly simple templating engine. Intended
 for building fast website. But can be used for any text substitution needs.
 
+Run tempest -h for help
+
 """
 
 import os
