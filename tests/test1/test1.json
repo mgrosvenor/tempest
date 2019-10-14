@@ -1,0 +1,6 @@
+{
+  "head":"##head.txt",
+  "body":"This is the body",
+  "long": "A multi-\nline string",
+  "foot":"##foot.txt"
+}
