@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+"""
+Tempest is a really ridiculously stupidly simple templating engine. Intended
+for building fast website. But can be used for any text substitution needs.
+
+"""
+
+import os
+import sys
+from string import Template
+import json
+import argparse
+
+def load_temp(temp):
+    temp_file = open(temp)
+    result = temp_file.read()
+    return result
+
+def load_dicts(args_dicts):
+    print("Loading dictonaries...")
+    result = {}
+    for arg_dict in args_dicts:
+        print("Loading %s..." % arg_dict)
+        with open(args_dicts) as json_file:
+            data = json.load(json_file)
+        result.update(data)
+    return result
+
+def run_opt(out, args_opt):
+    if(args_opt == 3):
+        out.strip();
+    return out
+
+def run_subs(temp, dict, args_out):
+    t = Template(temp)
+    result = t.substitute(dict)
+    return result
+
+    #do the substituting
+    print("Running substitutions...")
+    temps = os.listdir(temp)
+    count = 0
+    for temp in temps:
+        print("Working on %s ..." % (temp),)
+
+        count += 1
+        print("Done.")
+
+    print("%i file(s) completed." % (count))
+
+
+def save_opt(opt, args_out):
+    print("Savign output...")
+    out = open(args_out,"w")
+    out.write(opt)
+    out.close()
+    return
+
+# Real fun starts here....
+parser = argparse.ArgumentParser(description='A really ridiculously stupidly simple templating engine.',
+ epilog="example: tempest -t my.t -d values.json -o my.html\n\n")
+
+parser.add_argument(dest='temp', action='store',
+                    help='Template file to peform replacements on')
+parser.add_argument(dest='dicts', action='store', nargs='+',
+                    help='One or more JSON dictoaries defining replacements')
+parser.add_argument('-o','--output', dest='out', action='store', nargs='?',
+                    help='Output file')
+parser.add_argument('-O','--optimize-level', dest='opt', action='store',
+                    help='Optimization level [0 = none (default), 3 = max]',
+                    default=0)
+parser.add_argument('-i','--includes', dest='incls', action='store', nargs='*',
+                    help='Direcotry to look in for inclusions')
+
+if len(sys.argv) == 1:
+    parser.print_help()
+    sys.exit(1)
+
+args = parser.parse_args()
+
+args_temp  = args.temp
+args_dicts = args.dicts
+args_out   = args.out
+if args_out is None:
+    args_out = args_temp + ".out"
+
+args_opt   = args.opt
+args_incls = args.incls
+
+temp  = load_temp(args_temp)
+dict  = load_dicts(args_dicts)
+out   = run_subs(temp, dict)
+opt   = run_opt(out, args_opt)
+save_opt(opt, args_out)
