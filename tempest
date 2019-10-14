@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+"""
+Tempest is a really ridiculously stupidly simple templating engine. Intended
+for building fast website. But can be used for any text substitution needs.
+
+Run tempest -h for help
+
+"""
+
+import os
+import sys
+from string import Template
+import json
+import argparse
+
+class TemplateString(Template):
+    delimiter = '$$'
+
+class TemplateFile(Template):
+    delimiter = '##'
+
+def load_file(f):
+    #print("  Opening %s..." % f)
+    f = open(f)
+    result = f.read()
+    return result
+
+def load_temp(t):
+    #print("Loading tempalte...")
+    return load_file(t)
+
+
+def load_incl(incl,incl_dirs):
+    if os.path.exists(incl):
+        return load_file(incl)
+
+    for incl_dir in incl_dirs:
+        incl_dir += "/" if incl_dir[-1] != "/" else ""
+        incl_path = incl_dir + incl
+        if os.path.exists(incl_path):
+            return load_file(incl_path)
+
+    print("Error: file '%s' not found" % incl)
+
+
+def add_value(id,val,result,incl_dirs):
+        if id in result:
+            print("Warning: Identifer '%s' already defined. Overwriting." % id)
+        if "##" in val:
+            result[id] = load_incl(val[2:],incl_dirs)
+        else:
+            result[id] = val
+
+def load_dict(args_incls, args_incl_dirs, args_defs):
+    result = {}
+    #print("\nLoading dictonaries...")
+    for arg_def in args_defs:
+        define = arg_def.split("=")
+        if len(define) < 2:
+            print("Error: Definition failure '%s'" % args_defs)
+            print("       definitions must be in the form identifier=value")
+            exit(-1)
+
+        id = define[0]
+        val = "=".join(define[1:])
+        add_value(id,val,result, args_incl_dirs)
+
+    for args_incl in args_incls:
+        incl = load_incl(args_incl, args_incl_dirs)
+        data = json.loads(incl)
+        keys = data.keys()
+        for k in keys:
+            add_value(k,data[k],result, args_incl_dirs)
+
+    return result
+
+def run_opt(out, args_opt):
+    if(args_opt == 3):
+        out.strip();
+    return out
+
+def run_subs(temp, dict):
+    s = TemplateString(temp)
+    temp = s.safe_substitute(dict)
+    f = TemplateFile(temp)
+    result = f.safe_substitute(dict)
+    return result
+
+
+def save_opt(opt, args_out):
+    #print("\nSaving output...")
+    #print("  Writing to '%s'..." % args_out )
+    out = open(args_out,"w")
+    out.write(opt)
+    out.close()
+    return
+
+# Real fun starts here....
+parser = argparse.ArgumentParser(description='A really ridiculously stupidly simple templating engine.',
+ epilog="example: tempest -t my.t -d values.json -o my.html\n\n")
+
+parser.add_argument(dest='temp', action='store',
+                    help='Template file to peform replacements on')
+parser.add_argument("-i", dest='incls', action='append',
+                    help='One or more JSON dictoaries defining insertions/replacements map')
+parser.add_argument('-o', dest='out', action='store',
+                    help='Output file')
+parser.add_argument('-I', dest='incl_dirs', action='append',
+                    help='Direcotry to look in for inclusions')
+parser.add_argument('-D', dest='defs', action='append',
+                    help='Manual definitions')
+
+if len(sys.argv) == 1:
+    parser.print_help()
+    sys.exit(1)
+
+args = parser.parse_args()
+
+if args.incls is None and args.defs is None:
+    parser.print_help()
+    print("\nError: must supply dictoary (-i) and/or manual definition(s) (-D)")
+    sys.exit(1)
+
+if args.out is None:
+    args.out = args.temp + ".out"
+
+temp_str  = load_temp(args.temp)
+dict      = load_dict(args.incls, args.incl_dirs, args.defs)
+out_str   = run_subs(temp_str, dict)
+save_opt(out_str, args.out)
