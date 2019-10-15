@@ -8,7 +8,7 @@ NAME
 SYNOPSIS
 ========
 
-| **tempest** TEMPLATE [-D DEFS]  [-i INCLS] [-I INCL_DIRS] [-o OUT] [-h]
+| **tempest** TEMPLATE [-D DEFS]  [-i INCLS] [-I INCL_DIRS] [-C CTXTS] [-o OUT] [-W WARN] [-h]
 
 DESCRIPTION
 ===========
@@ -39,9 +39,22 @@ TEMPLATE
 
 :    Directory to look in for inclusion files
 
+-C CTXTS
+
+:   List of context identifiers
+
 -o OUT
 
 :   Outputs the result to the given filename.
+
+-W WARN
+
+:   Changes warning parmeters. Suported options are
+* error - turn all warnings into errors
+* no-overwrite - ignore multiple definitions in dictionaries that will overwite each other 
+* no-overwrite-context - as above, but when contexts are used 
+* no-file-not-found - ignore file not found warnings 
+* no-define-fail - ignore poor definitions on the command line (using -D)
 
 -v, --version
 
@@ -92,7 +105,37 @@ Or with the JOSN file
 }
 ```
 
+## Context 
+String replacement/file insertion can be performed in a specific context. This allows the same template to be used for many different outputs. For example 
 
+template.txt 
+```
+My name is $$name
+```
+
+with config.json file
+```
+{
+    "real":
+    {
+        "name":"Matthew"
+    },
+    "online":
+    {
+        "name":"mgrosvenor"
+    }
+}
+```
+
+Compling with `tempest tempalte.txt -i config.json -C real` produces:
+```
+My name is Matthew
+```
+
+While compiling with `tempest tempalte.txt -i config.json -C online` produces:
+```
+My name is mgrosvnor
+```
 
 BUGS
 ====
