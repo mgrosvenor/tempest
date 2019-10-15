@@ -86,7 +86,7 @@ To denote file replacements, prepend the file name with `##`. For example, using
 Or with the JOSN file
 ```
 {
-    "confif":"##/etc/config.conf"
+    "config":"##/etc/config.conf"
 }
 ```
 
