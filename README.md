@@ -72,10 +72,12 @@ Or with the JOSN file
 
 The `$$` literal can be escaped using `$$$$`.
 
-If the substitution pattern is contained in another string (e.g. "$names") then the escaped pattern `${name}` may be used instead.
+If the substitution pattern is contained in another string (e.g. "$names") then the escaped pattern `${name}` may be used instead. 
 
 ## File Insertion
-File insertion is performed using the `##` special symbol. For example
+File insertion is performed using the `##` special symbol. As before, the `##` literal can be escaped using `####`.
+
+For example
 ```
 ##config
 ```
@@ -90,7 +92,6 @@ Or with the JOSN file
 }
 ```
 
-The `##` literal can be escaped using `####`
 
 
 BUGS
