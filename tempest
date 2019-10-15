@@ -119,7 +119,7 @@ def load_dict(args_incls, args_incl_dirs, args_defs, contexts):
 
         id = define[0]
         val = "=".join(define[1:])
-        add_value(id,val,result, args_incl_dirs)
+        add_value(id,val,result, args_incl_dirs, False)
 
     for args_incl in args_incls:
         incl = load_incl(args_incl, args_incl_dirs)
