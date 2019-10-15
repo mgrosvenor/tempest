@@ -90,6 +90,9 @@ Or with the JOSN file
 }
 ```
 
+The `##` literal can be escaped using `####`
+
+
 BUGS
 ====
 
