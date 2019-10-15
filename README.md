@@ -79,14 +79,14 @@ File insertion is performed using the `##` special symbol. For example
 ```
 ##config
 ```
-With the command line option
+To denote file replacements, prepend the file name with `##`. For example, using the command line option:
 ```
--Dconfig=/etc/config.conf
+-Dconfig=##/etc/config.conf
 ```
 Or with the JOSN file
 ```
 {
-    "confif":"/etc/config.conf"
+    "confif":"##/etc/config.conf"
 }
 ```
 
