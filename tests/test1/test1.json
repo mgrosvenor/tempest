@@ -1,6 +1,15 @@
 {
+  "url":"google.com",
   "head":"##head.txt",
   "body":"This is the body",
   "long": "A multi-\nline string",
-  "foot":"##foot.txt"
+  "foot":"##foot.txt",
+
+  "test1.tmpl" :
+  {
+    "url" : "yahoo.com",
+    "head":"##foot.txt",
+    "foot":"##head.txt"
+  }
+
 }

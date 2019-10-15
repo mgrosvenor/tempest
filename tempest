@@ -16,6 +16,9 @@ import sys
 from string import Template
 import json
 import argparse
+import collections
+from collections import OrderedDict
+
 
 class TemplateString(Template):
     delimiter = '$$'
@@ -23,16 +26,62 @@ class TemplateString(Template):
 class TemplateFile(Template):
     delimiter = '##'
 
+def message(type, err_code, text):
+    if type == "info":
+        sys.stderr.write("Info: %s\n", text)
+    elif type == "error" or (type == "warn" and "error" in args.warnings):
+        if type == "warn" and ("no-" + err_code) in args.warnings:
+            return
+        sys.stderr.write("Error (%s): %s Terminating.\n" % (err_code, text))
+        sys.exit(-1)
+    elif type == "warn":
+        if ("no-" + err_code) in args.warnings:
+            return
+        sys.stderr.write("Warning (%s): %s\n" % (err_code,text))
+    elif type == "debug":
+        if args.verbose:
+            sys.stderr.write("Debug: %s\n" % text)
+    else:
+        print_message("error", "internal", "Unknown print message type '%s'." % type)
+
 def load_file(f):
-    #print("  Opening %s..." % f)
+    message("debug", None, "  Opening %s..." % f)
     f = open(f)
     result = f.read()
     return result
 
 def load_temp(t):
-    #print("Loading tempalte...")
+    message("debug", None, "Loading template...")
     return load_file(t)
 
+def run_subs(temp, dict):
+    message("debug", None, "Doing substitutions...")
+    try:
+        s = TemplateString(temp)
+        temp = s.substitute(dict)
+    except KeyError as e:
+        message("error", "string-sub", "String substitution '%s' not found." % e.message)
+    try:
+        f = TemplateFile(temp)
+        result = f.substitute(dict)
+    except KeyError as e:
+        message("error", "file-sub", "File insertion '%s' not found." % e.message)
+
+    return result
+
+def load_subs_file(file,incl_dirs,dict):
+    if os.path.exists(file):
+        file_str = load_file(file)
+        return run_subs(file_str,dict)
+
+    for incl_dir in incl_dirs:
+        incl_dir += "/" if incl_dir[-1] != "/" else ""
+        file_path = incl_dir + file
+        if os.path.exists(file_path):
+            file_str = load_file(file_path)
+            return run_subs(file_str,dict)
+
+    message("warn", "file-not-found", "Include file '%s' not found." % incl)
 
 def load_incl(incl,incl_dirs):
     if os.path.exists(incl):
@@ -44,26 +93,29 @@ def load_incl(incl,incl_dirs):
         if os.path.exists(incl_path):
             return load_file(incl_path)
 
-    print("Error: file '%s' not found" % incl)
+    message("warn", "file-not-found", "Include file '%s' not found." % incl)
 
 
-def add_value(id,val,result,incl_dirs):
+def add_value(id,val,result,incl_dirs,has_context):
         if id in result:
-            print("Warning: Identifer '%s' already defined. Overwriting." % id)
+            if has_context:
+                message("warn", "overwrite-context", "Identifer '%s' already defined in global scope. Conext will overwrite." % id)
+            else:
+                message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % id)
+
         if "##" in val:
-            result[id] = load_incl(val[2:],incl_dirs)
+            result[id] = load_subs_file(val[2:],incl_dirs,result)
         else:
             result[id] = val
 
-def load_dict(args_incls, args_incl_dirs, args_defs):
+def load_dict(args_incls, args_incl_dirs, args_defs, contexts):
     result = {}
-    #print("\nLoading dictonaries...")
+    message("debug", None, "Loading dictonaries...")
     for arg_def in args_defs:
         define = arg_def.split("=")
         if len(define) < 2:
-            print("Error: Definition failure '%s'" % args_defs)
-            print("       definitions must be in the form identifier=value")
-            exit(-1)
+            message("warn", "define-fail", "Definition failure '%s'. Definitions must be in the form identifier=value." % args_defs)
+            continue
 
         id = define[0]
         val = "=".join(define[1:])
@@ -71,33 +123,26 @@ def load_dict(args_incls, args_incl_dirs, args_defs):
 
     for args_incl in args_incls:
         incl = load_incl(args_incl, args_incl_dirs)
-        data = json.loads(incl)
-        keys = data.keys()
-        for k in keys:
-            add_value(k,data[k],result, args_incl_dirs)
+        config = json.loads(incl.decode('utf-8'), object_pairs_hook=OrderedDict)
+        for node in config:
+            message("debug",None,"Looking at node %s" % node)
+            if isinstance(config[node], collections.Mapping) and node in contexts:
+                for sub_node in config[node]:
+                    add_value(sub_node,config[node][sub_node],result, args_incl_dirs, True)
+            else:
+                add_value(node,config[node],result, args_incl_dirs, False)
 
     return result
 
-def run_opt(out, args_opt):
-    if(args_opt == 3):
-        out.strip();
-    return out
 
-def run_subs(temp, dict):
-    s = TemplateString(temp)
-    temp = s.safe_substitute(dict)
-    f = TemplateFile(temp)
-    result = f.safe_substitute(dict)
-    return result
-
-
-def save_opt(opt, args_out):
-    #print("\nSaving output...")
-    #print("  Writing to '%s'..." % args_out )
+def write_out(result, args_out):
+    message("debug", None, "Saving output...")
+    message("debug", None, "  Writing to '%s'..." % args_out )
     out = open(args_out,"w")
-    out.write(opt)
+    out.write(result)
     out.close()
     return
+
 
 # Real fun starts here....
 parser = argparse.ArgumentParser(description='A really ridiculously stupidly simple templating engine.',
@@ -111,23 +156,30 @@ parser.add_argument("-i", dest='incls', action='append', default=[],
                     help='One or more JSON dictionaries defining insertions/replacements map')
 parser.add_argument('-I', dest='incl_dirs', action='append', default=[],
                     help='Direcotry to look in for inclusions')
+parser.add_argument('-C', dest='ctxs', action='append', default=[],
+                    help='Select contexts available in dictoary files')
+parser.add_argument('-W', dest='warnings', action='append', default=[],
+                    help='Configure warnings. -Werror, -Wno-overwrite, -Wno-overwrite-context, -Wno-file-not-found, -Wno-define-fail')
 parser.add_argument('-o', dest='out', action='store',
                     help='Output file')
 parser.add_argument('-v', "--version", dest='version', action='store_const', const=1,
                     help='Prints the current version number')
+parser.add_argument('-V', "--verbose", dest='verbose', action='store_const', const=1,
+                    help='Include more verbose output')
+
 
 if len(sys.argv) == 1:
     parser.print_help()
     sys.exit(1)
 
 for arg in sys.argv:
-    if "-v" in arg or "--version" in arg:
+    if "-v" in arg[0:2] or "--version" in arg[0:9]:
         print("Tempest version 0.1")
         sys.exit(0)
 
 args = parser.parse_args()
 
-if args.incls is None and args.defs is None:
+if len(args.incls) == 0 and len(args.defs)==0:
     parser.print_help()
     print("\nError: must supply dictoary (-i) and/or manual definition(s) (-D)")
     sys.exit(1)
@@ -135,7 +187,7 @@ if args.incls is None and args.defs is None:
 if args.out is None:
     args.out = args.temp + ".out"
 
-temp_str  = load_temp(args.temp)
-dict      = load_dict(args.incls, args.incl_dirs, args.defs)
-out_str   = run_subs(temp_str, dict)
-save_opt(out_str, args.out)
+dict      = load_dict(args.incls, args.incl_dirs, args.defs, args.ctxs)
+template  = load_temp(args.temp)
+result    = run_subs(template, dict)
+write_out(result, args.out)
