@@ -105,11 +105,11 @@ parser = argparse.ArgumentParser(description='A really ridiculously stupidly sim
 
 parser.add_argument(dest='temp', action='store',
                     help='Template file to peform replacements on')
-parser.add_argument('-D', dest='defs', action='append',
+parser.add_argument('-D', dest='defs', action='append', default=[],
                     help='Manual definitions')
-parser.add_argument("-i", dest='incls', action='append',
+parser.add_argument("-i", dest='incls', action='append', default=[],
                     help='One or more JSON dictionaries defining insertions/replacements map')
-parser.add_argument('-I', dest='incl_dirs', action='append',
+parser.add_argument('-I', dest='incl_dirs', action='append', default=[],
                     help='Direcotry to look in for inclusions')
 parser.add_argument('-o', dest='out', action='store',
                     help='Output file')
