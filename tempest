@@ -4,9 +4,10 @@
 
 """
 Tempest is a really ridiculously stupidly simple templating engine. Intended
-for building fast website. But can be used for any text substitution needs.
+for building fast static websites, but can be used for any text substitution
+needs.
 
-Run tempest -h for help
+Run tempest -h for help.
 
 """
 
@@ -104,18 +105,25 @@ parser = argparse.ArgumentParser(description='A really ridiculously stupidly sim
 
 parser.add_argument(dest='temp', action='store',
                     help='Template file to peform replacements on')
-parser.add_argument("-i", dest='incls', action='append',
-                    help='One or more JSON dictoaries defining insertions/replacements map')
-parser.add_argument('-o', dest='out', action='store',
-                    help='Output file')
-parser.add_argument('-I', dest='incl_dirs', action='append',
-                    help='Direcotry to look in for inclusions')
 parser.add_argument('-D', dest='defs', action='append',
                     help='Manual definitions')
+parser.add_argument("-i", dest='incls', action='append',
+                    help='One or more JSON dictionaries defining insertions/replacements map')
+parser.add_argument('-I', dest='incl_dirs', action='append',
+                    help='Direcotry to look in for inclusions')
+parser.add_argument('-o', dest='out', action='store',
+                    help='Output file')
+parser.add_argument('-v', "--version", dest='version', action='store_const', const=1,
+                    help='Prints the current version number')
 
 if len(sys.argv) == 1:
     parser.print_help()
     sys.exit(1)
+
+for arg in sys.argv:
+    if "-v" in arg or "--version" in arg:
+        print("Tempest version 0.1")
+        sys.exit(0)
 
 args = parser.parse_args()
 

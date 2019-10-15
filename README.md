@@ -25,11 +25,7 @@ This should make it easy to integrate into Makefile environments.
 
 TEMPLATE
 
-:    Template file to perform replacements on. 
-
--h, --help
-
-:   Prints brief usage information.
+:    Template file to perform replacements on.
 
 -D DEFS
 
@@ -37,7 +33,7 @@ TEMPLATE
 
 -i INCLS      
 
-:     One or more JSON dictionaries defining insertions/replacements map
+:    One or more JSON dictionaries defining insertions/replacements map
 
 -I INCL_DIRS  
 
@@ -50,6 +46,11 @@ TEMPLATE
 -v, --version
 
 :   Prints the current version number.
+
+-h, --help
+
+:   Prints brief usage information.
+
 
 USAGE
 =========
