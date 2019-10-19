@@ -67,10 +67,12 @@ def _invalid(mo,template):
     raise ValueError('Invalid placeholder in string: line %d, col %d' %
                      (lineno, colno))
 
-files = []
-dicts = []
-template_file = ""
-def substitute(template,filein,out,mapping,context):
+files           = []
+dicts           = []
+template_file   = ""
+incl_dirs       = []
+out_file        = ""
+def substitute(template,filein,mapping,context):
 
     # Helper function for .sub()
     def convert(mo):
@@ -81,7 +83,7 @@ def substitute(template,filein,out,mapping,context):
             files.append(filein)
 
             if named == "__OUT__":
-                result = '%s' % (out,)
+                result = '%s' % (out_file,)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
@@ -112,7 +114,6 @@ def substitute(template,filein,out,mapping,context):
                     result = "[" + ",".join(files_out) + "]"
                 message("debug", "", "Returning '%s'" % result)
                 return result
-
 
             if named == "__CMD__":
                 result = "tempest " + " ".join(sys.argv[1:])
@@ -145,7 +146,6 @@ def substitute(template,filein,out,mapping,context):
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-
             # This is the custom part, I want to support in place contexts
             context_name = named.split(".")
             if len(context_name) <= 1:
@@ -158,6 +158,10 @@ def substitute(template,filein,out,mapping,context):
                         named = ctx_named
 
             val = mapping[named]
+            if val[:2] == "##":
+                file_str = load_subs_file(val[2:],mapping,context)
+                message("debug", "", "Evaluated %s:%s" % (named, file_str))
+                val = file_str
 
             # We use this idiom instead of str() because the latter will
             # fail if val is a Unicode containing non-ASCII characters.
@@ -207,26 +211,26 @@ def load_temp(t):
     message("debug", None, "Loading template...")
     return load_file(t)
 
-def run_subs(temp, filein, out, dict, ctxt):
+def run_subs(temp, filein, dict, ctxt):
     message("debug", None, "Doing substitutions...")
     try:
-        result = substitute(temp,filein, out, dict, ctxt)
+        result = substitute(temp,filein, dict, ctxt)
     except KeyError as e:
         message("error", "string-sub", "Substitution '%s' not found in '%s'." % (e.message, filein))
 
     return result
 
-def load_subs_file(file,incl_dirs,out,dict,context):
+def load_subs_file(file, dict,context):
     if os.path.exists(file):
         file_str = load_file(file)
-        return run_subs(file_str,file, out, dict, context)
+        return run_subs(file_str,file, dict, context)
 
     for incl_dir in incl_dirs:
         incl_dir += "/" if incl_dir[-1] != "/" else ""
         file_path = incl_dir + file
         if os.path.exists(file_path):
             file_str = load_file(file_path)
-            return run_subs(file_str,file, out, dict, context)
+            return run_subs(file_str,file, dict, context)
 
     message("warn", "file-not-found", "Include file '%s' not found." % file)
 
@@ -252,13 +256,8 @@ def add_value(context,id,val,result,incl_dirs, global_context):
         if id in result:
             message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % id)
 
-        if "##" in val:
-            file_str = load_subs_file(val[2:],incl_dirs,id,result, global_context )
-            message("debug", "", "Adding %s:%s" % (id, file_str))
-            result[id] = file_str
-        else:
-            message("debug", "", "Adding %s:%s" % (id, val))
-            result[id] = val
+        message("debug", "", "Adding %s:%s" % (id, val))
+        result[id] = val
 
 def load_dict(args_incls, args_incl_dirs, args_defs, global_context):
     result = {}
@@ -293,7 +292,7 @@ def load_dict(args_incls, args_incl_dirs, args_defs, global_context):
 def write_out(result, args_out):
     if args.out is None:
         out = sys.stdout
-    else:            
+    else:
         message("debug", None, "Saving output...")
         message("debug", None, "  Writing to '%s'..." % args_out )
         out = open(args_out,"w")
@@ -345,9 +344,10 @@ if len(args.incls) == 0 and len(args.defs)==0:
 
 
 template_file = args.temp
-
+incl_dirs     = args.incl_dirs
+out_file      = args.out
 
 dict      = load_dict(args.incls, args.incl_dirs, args.defs, args.ctxt)
 template  = load_temp(args.temp)
-result    = run_subs(template, args.temp, args.out, dict, args.ctxt)
+result    = run_subs(template, args.temp, dict, args.ctxt)
 write_out(result, args.out)
