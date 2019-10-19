@@ -5,7 +5,7 @@
   "long": "A multi-\nline string",
   "foot":"##foot.txt",
 
-  "test1.tmpl" :
+  "ctx1" :
   {
     "url" : "yahoo.com",
     "head":"##foot.txt",

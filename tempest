@@ -18,13 +18,163 @@ import json
 import argparse
 import collections
 from collections import OrderedDict
+import re
+import datetime
+
+__MAJOR = 1
+__MINOR = 0
+
+__NAME   = "Tempest"
+__VERSTR = "%s version %i.%i" % (__NAME, __MAJOR, __MINOR)
+__COPYR = "Copyright Matthew P. Grosvenor (C) 2019"
+
+################################################################################
+# Custom find/replace Code
+################################################################################
+"""
+This code is shamelessly copied from https://github.com/enthought/Python-2.7.3
+I would have prefered to use the standard String Template library, but it was
+not quite enough for the my needsself. This is simplified in some ways (removed
+the class structure), and extended in other ways (customised the "convert"
+function) version of that code.
+"""
+
+delimiter = '$$'
+idpattern = r'[_a-z][_a-z0-9]*\.[_a-z][_a-z0-9]*|[_a-z][_a-z0-9]*'
+pattern = r"""
+%(delim)s(?:
+  (?P<escaped>%(delim)s) |   # Escape sequence of two delimiters
+  (?P<named>%(id)s)      |   # delimiter and a Python identifier
+  {(?P<braced>%(id)s)}   |   # delimiter and a braced identifier
+  (?P<invalid>)              # Other ill-formed delimiter exprs
+)
+"""
+pattern = pattern % {
+    'delim' : re.escape(delimiter),
+    'id'    : idpattern,
+    }
+pattern = re.compile(pattern, re.IGNORECASE | re.VERBOSE)
+
+def _invalid(mo,template):
+    i = mo.start('invalid')
+    lines = template[:i].splitlines(True)
+    if not lines:
+        colno = 1
+        lineno = 1
+    else:
+        colno = i - len(''.join(lines[:-1]))
+        lineno = len(lines)
+    raise ValueError('Invalid placeholder in string: line %d, col %d' %
+                     (lineno, colno))
+
+files = []
+dicts = []
+template_file = ""
+def substitute(template,filein,out,mapping,context):
+
+    # Helper function for .sub()
+    def convert(mo):
+        # Check the most common path first.
+        named = mo.group('named') or mo.group('braced')
+        message("debug", "", "Got new name '%s'" % named)
+        if named is not None:
+            files.append(filein)
+
+            if named == "__OUT__":
+                result = '%s' % (out,)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__FILE__":
+                result = '%s' % (filein,)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__TEMPLATE__":
+                result = '%s' % (template_file,)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__DICTS__":
+                result = ""
+                dicts_out = []
+                [dicts_out.append(item) for item in dicts if item not in dicts_out]
+                if dicts_out is not None and dicts_out != []:
+                    result = "[" + ",".join(dicts_out) + "]"
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__FILES__":
+                result = ""
+                files_out = []
+                [files_out.append(item) for item in files if item not in files_out]
+                if files_out is not None and files_out != []:
+                    result = "[" + ",".join(files_out) + "]"
+                message("debug", "", "Returning '%s'" % result)
+                return result
 
 
-class TemplateString(Template):
-    delimiter = '$$'
+            if named == "__CMD__":
+                result = "tempest " + " ".join(sys.argv[1:])
+                message("debug", "", "Returning '%s'" % result)
+                return result
 
-class TemplateFile(Template):
-    delimiter = '##'
+            if named == "__DATE__":
+                now = datetime.datetime.now()
+                result = '%s' % (now.strftime("%Y-%m-%d %H:%M"),)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__TE__":
+                result = '%s' % (__NAME,)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__TE_MAJOR__":
+                result = '%s' % (__MAJOR)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__TE_MINOR__":
+                result = '%s' % (__MINOR)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+            if named == "__TEVER__":
+                result = '%s' % (__VERSTR,)
+                message("debug", "", "Returning '%s'" % result)
+                return result
+
+
+            # This is the custom part, I want to support in place contexts
+            context_name = named.split(".")
+            if len(context_name) <= 1:
+                #No context name in the template
+                #try to use the global context, if there is one
+                if context is not None:
+                    ctx_named = context + "." + named
+                    message("debug", "", "Looking for %s" % ctx_named)
+                    if ctx_named in mapping:
+                        named = ctx_named
+
+            val = mapping[named]
+
+            # We use this idiom instead of str() because the latter will
+            # fail if val is a Unicode containing non-ASCII characters.
+            result = '%s' % (val,)
+            message("debug", "", "Returning '%s'" % result)
+            return result
+
+        if mo.group('escaped') is not None:
+            return delimiter
+        if mo.group('invalid') is not None:
+            _invalid(mo,template)
+        raise ValueError('Unrecognized named group in pattern',
+                         pattern)
+
+    return pattern.sub(convert, template)
+
+################################################################################
 
 def message(type, err_code, text):
     if type == "info":
@@ -42,10 +192,13 @@ def message(type, err_code, text):
         if args.verbose:
             sys.stderr.write("Debug: %s\n" % text)
     else:
-        print_message("error", "internal", "Unknown print message type '%s'." % type)
+        message("error", "internal", "Unknown print message type '%s'." % type)
 
 def load_file(f):
     message("debug", None, "  Opening %s..." % f)
+    if not os.path.exists(f):
+        message("error", "file-not-found", "File '%s' not found." % f)
+
     f = open(f)
     result = f.read()
     return result
@@ -54,61 +207,60 @@ def load_temp(t):
     message("debug", None, "Loading template...")
     return load_file(t)
 
-def run_subs(temp, dict):
+def run_subs(temp, filein, out, dict, ctxt):
     message("debug", None, "Doing substitutions...")
     try:
-        s = TemplateString(temp)
-        temp = s.substitute(dict)
+        result = substitute(temp,filein, out, dict, ctxt)
     except KeyError as e:
-        message("error", "string-sub", "String substitution '%s' not found." % e.message)
-    try:
-        f = TemplateFile(temp)
-        result = f.substitute(dict)
-    except KeyError as e:
-        message("error", "file-sub", "File insertion '%s' not found." % e.message)
+        message("error", "string-sub", "Substitution '%s' not found in '%s'." % (e.message, filein))
 
     return result
 
-def load_subs_file(file,incl_dirs,dict):
+def load_subs_file(file,incl_dirs,out,dict,context):
     if os.path.exists(file):
         file_str = load_file(file)
-        return run_subs(file_str,dict)
+        return run_subs(file_str,file, out, dict, context)
 
     for incl_dir in incl_dirs:
         incl_dir += "/" if incl_dir[-1] != "/" else ""
         file_path = incl_dir + file
         if os.path.exists(file_path):
             file_str = load_file(file_path)
-            return run_subs(file_str,dict)
+            return run_subs(file_str,file, out, dict, context)
 
-    message("warn", "file-not-found", "Include file '%s' not found." % incl)
+    message("warn", "file-not-found", "Include file '%s' not found." % file)
 
 def load_incl(incl,incl_dirs):
     if os.path.exists(incl):
+        dicts.append(incl)
         return load_file(incl)
 
     for incl_dir in incl_dirs:
         incl_dir += "/" if incl_dir[-1] != "/" else ""
         incl_path = incl_dir + incl
         if os.path.exists(incl_path):
+            dicts.append(incl_path)
             return load_file(incl_path)
 
-    message("warn", "file-not-found", "Include file '%s' not found." % incl)
+    message("error", "file-not-found", "Include file '%s' not found." % incl)
 
 
-def add_value(id,val,result,incl_dirs,has_context):
+def add_value(context,id,val,result,incl_dirs, global_context):
+        if context != None:
+            id = context + "." + id
+
         if id in result:
-            if has_context:
-                message("warn", "overwrite-context", "Identifer '%s' already defined in global scope. Conext will overwrite." % id)
-            else:
-                message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % id)
+            message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % id)
 
         if "##" in val:
-            result[id] = load_subs_file(val[2:],incl_dirs,result)
+            file_str = load_subs_file(val[2:],incl_dirs,id,result, global_context )
+            message("debug", "", "Adding %s:%s" % (id, file_str))
+            result[id] = file_str
         else:
+            message("debug", "", "Adding %s:%s" % (id, val))
             result[id] = val
 
-def load_dict(args_incls, args_incl_dirs, args_defs, contexts):
+def load_dict(args_incls, args_incl_dirs, args_defs, global_context):
     result = {}
     message("debug", None, "Loading dictonaries...")
     for arg_def in args_defs:
@@ -119,26 +271,32 @@ def load_dict(args_incls, args_incl_dirs, args_defs, contexts):
 
         id = define[0]
         val = "=".join(define[1:])
-        add_value(id,val,result, args_incl_dirs, False)
+        add_value(None, id,val,result, args_incl_dirs, global_context)
 
     for args_incl in args_incls:
         incl = load_incl(args_incl, args_incl_dirs)
+
         config = json.loads(incl.decode('utf-8'), object_pairs_hook=OrderedDict)
         for node in config:
             message("debug",None,"Looking at node %s" % node)
-            if isinstance(config[node], collections.Mapping) and node in contexts:
-                for sub_node in config[node]:
-                    add_value(sub_node,config[node][sub_node],result, args_incl_dirs, True)
+            if isinstance(config[node], collections.Mapping):
+                ctxt_name = node
+                ctxt_map  = config[node]
+                for ctxt_id in ctxt_map :
+                    add_value(ctxt_name,ctxt_id,ctxt_map[ctxt_id],result,args_incl_dirs, global_context)
             else:
-                add_value(node,config[node],result, args_incl_dirs, False)
+                add_value(None, node,config[node],result, args_incl_dirs, global_context)
 
     return result
 
 
 def write_out(result, args_out):
-    message("debug", None, "Saving output...")
-    message("debug", None, "  Writing to '%s'..." % args_out )
-    out = open(args_out,"w")
+    if args.out is None:
+        out = sys.stdout
+    else:            
+        message("debug", None, "Saving output...")
+        message("debug", None, "  Writing to '%s'..." % args_out )
+        out = open(args_out,"w")
     out.write(result)
     out.close()
     return
@@ -156,8 +314,8 @@ parser.add_argument("-i", dest='incls', action='append', default=[],
                     help='One or more JSON dictionaries defining insertions/replacements map')
 parser.add_argument('-I', dest='incl_dirs', action='append', default=[],
                     help='Direcotry to look in for inclusions')
-parser.add_argument('-C', dest='ctxs', action='append', default=[],
-                    help='Select contexts available in dictoary files')
+parser.add_argument('-C', dest='ctxt', action='store', default=None,
+                    help='Use the given context from the dictionary file(s)')
 parser.add_argument('-W', dest='warnings', action='append', default=[],
                     help='Configure warnings. -Werror, -Wno-overwrite, -Wno-overwrite-context, -Wno-file-not-found, -Wno-define-fail')
 parser.add_argument('-o', dest='out', action='store',
@@ -174,7 +332,8 @@ if len(sys.argv) == 1:
 
 for arg in sys.argv:
     if "-v" in arg[0:2] or "--version" in arg[0:9]:
-        print("Tempest version 0.1")
+        print(__VERSTR)
+        print(__COPYR)
         sys.exit(0)
 
 args = parser.parse_args()
@@ -184,10 +343,11 @@ if len(args.incls) == 0 and len(args.defs)==0:
     print("\nError: must supply dictoary (-i) and/or manual definition(s) (-D)")
     sys.exit(1)
 
-if args.out is None:
-    args.out = args.temp + ".out"
 
-dict      = load_dict(args.incls, args.incl_dirs, args.defs, args.ctxs)
+template_file = args.temp
+
+
+dict      = load_dict(args.incls, args.incl_dirs, args.defs, args.ctxt)
 template  = load_temp(args.temp)
-result    = run_subs(template, dict)
+result    = run_subs(template, args.temp, args.out, dict, args.ctxt)
 write_out(result, args.out)

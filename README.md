@@ -1,4 +1,4 @@
-% Tempest Version 0.1 | A really ridiculously stupidly simple template engine.
+% Tempest Version 1.0 | A really ridiculously stupidly simple template engine.
 
 NAME
 ====
@@ -24,45 +24,36 @@ Tempest is designed to have familiar arguments to C compiler (e.g. GCC, CLANG).
 This should make it easy to integrate into Makefile environments.
 
 TEMPLATE
-
-:    Template file to perform replacements on.
+Template file to perform replacements on.
 
 -D DEFS
-
-:   Manual definitions in the form "name=value"
+Manual definitions in the form "name=value"
 
 -i INCLS      
-
-:    One or more JSON dictionaries defining insertions/replacements map
+One or more JSON dictionaries defining insertions/replacements map
 
 -I INCL_DIRS  
+Directory to look in for inclusion files
 
-:    Directory to look in for inclusion files
-
--C CTXTS
-
-:   List of context identifiers
+-C CTXT
+Global context identifier
 
 -o OUT
-
-:   Outputs the result to the given filename.
+Outputs the result to the given filename.
 
 -W WARN
-
-:   Changes warning parmeters. Suported options are
+Changes warning parameters. Supported options are
 * error - turn all warnings into errors
-* no-overwrite - ignore multiple definitions in dictionaries that will overwite each other 
-* no-overwrite-context - as above, but when contexts are used 
-* no-file-not-found - ignore file not found warnings 
+* no-overwrite - ignore multiple definitions in dictionaries that will overwite each other
+* no-overwrite-context - as above, but when contexts are used
+* no-file-not-found - ignore file not found warnings
 * no-define-fail - ignore poor definitions on the command line (using -D)
 
 -v, --version
-
-:   Prints the current version number.
+Prints the current version number.
 
 -h, --help
-
-:   Prints brief usage information.
+Prints brief usage information.
 
 
 USAGE
@@ -85,16 +76,11 @@ Or with the JOSN file
 
 The `$$` literal can be escaped using `$$$$`.
 
-If the substitution pattern is contained in another string (e.g. "$names") then the escaped pattern `${name}` may be used instead. 
+If the substitution pattern is contained in another string (e.g. "$names") then the escaped pattern `${name}` may be used instead.
 
 ## File Insertion
-File insertion is performed using the `##` special symbol. As before, the `##` literal can be escaped using `####`.
-
-For example
-```
-##config
-```
-To denote file replacements, prepend the file name with `##`. For example, using the command line option:
+File insertion is performed using the `##` special symbol.
+To denote file replacements, prepend the file name with `##` in your mapping. For example, using the command line option:
 ```
 -Dconfig=##/etc/config.conf
 ```
@@ -105,10 +91,10 @@ Or with the JOSN file
 }
 ```
 
-## Context 
-String replacement/file insertion can be performed in a specific context. This allows the same template to be used for many different outputs. For example 
+## Context
+String replacement/file insertion can be performed in a specific context. This allows the same template to be used for many different outputs. For example
 
-template.txt 
+template.txt
 ```
 My name is $$name
 ```
@@ -136,6 +122,53 @@ While compiling with `tempest tempalte.txt -i config.json -C online` produces:
 ```
 My name is mgrosvnor
 ```
+
+Context information can also be added inline, for example
+```
+My name is $$online.name
+```
+
+While compiling with `tempest tempalte.txt -i config.json` produces:
+```
+My name is mgrosvnor
+```
+
+## Builtins
+A number of variables are predefined. These cannot be overridden.
+
+`$$__OUT__`
+The output file name as given by the -o "out" command line
+
+`$$__FILE__`
+The current file name that the template engine is working on (e.g. from includes)
+
+`$$__TEMPLATE__`
+The template name that the engine is working on on
+
+`$$__DICTS__`
+Sources of dictionaries for the template engine
+
+`$$__FILES__`
+Sources of files for this compilation
+
+`$$__CMD__`
+The complete command line given to Tempest
+
+`$$__DATE__`
+Today's date / time
+
+`$$__TE__`
+Name of the template engine
+
+`$$__TE_MAJOR__`
+Major version of the template engine
+
+`$$__TE_MINOR__`
+Minor version number of the template engine
+
+`$$__TEVER__`
+Version string for the template engine
+
 
 BUGS
 ====
