@@ -8,6 +8,7 @@
   "ctx1" :
   {
     "url" : "yahoo.com",
+    "full": "https://$$url/index.html",
     "head":"##foot.txt",
     "foot":"##head.txt"
   }

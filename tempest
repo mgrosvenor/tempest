@@ -32,11 +32,12 @@ __COPYR = "Copyright Matthew P. Grosvenor (C) 2019"
 # Custom find/replace Code
 ################################################################################
 """
-This code is shamelessly copied from https://github.com/enthought/Python-2.7.3
+This code is copied from https://github.com/enthought/Python-2.7.3
 I would have prefered to use the standard String Template library, but it was
-not quite enough for the my needsself. This is simplified in some ways (removed
+not quite enough for the my needs. My copy is simplified in some ways (removed
 the class structure), and extended in other ways (customised the "convert"
-function) version of that code.
+function). Making the "convert" functin a callback in the library would probably
+solve this issue.
 """
 
 delimiter = '$$'
@@ -72,32 +73,32 @@ dicts           = []
 template_file   = ""
 incl_dirs       = []
 out_file        = ""
-def substitute(template,filein,mapping,context):
+def substitute(template,filein,mapping,contexts):
 
     # Helper function for .sub()
     def convert(mo):
         # Check the most common path first.
-        named = mo.group('named') or mo.group('braced')
-        message("debug", "", "Got new name '%s'" % named)
-        if named is not None:
+        match = mo.group('named') or mo.group('braced')
+        message("debug", "", "Got new name '%s'" % match)
+        if match is not None:
             files.append(filein)
 
-            if named == "__OUT__":
+            if match == "__OUT__":
                 result = '%s' % (out_file,)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__FILE__":
+            if match == "__FILE__":
                 result = '%s' % (filein,)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__TEMPLATE__":
+            if match == "__TEMPLATE__":
                 result = '%s' % (template_file,)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__DICTS__":
+            if match == "__DICTS__":
                 result = ""
                 dicts_out = []
                 [dicts_out.append(item) for item in dicts if item not in dicts_out]
@@ -106,7 +107,7 @@ def substitute(template,filein,mapping,context):
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__FILES__":
+            if match == "__FILES__":
                 result = ""
                 files_out = []
                 [files_out.append(item) for item in files if item not in files_out]
@@ -115,53 +116,77 @@ def substitute(template,filein,mapping,context):
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__CMD__":
+            if match == "__CMD__":
                 result = "tempest " + " ".join(sys.argv[1:])
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__DATE__":
+            if match == "__DATE__":
                 now = datetime.datetime.now()
                 result = '%s' % (now.strftime("%Y-%m-%d %H:%M"),)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__TE__":
+            if match == "__TE__":
                 result = '%s' % (__NAME,)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__TE_MAJOR__":
+            if match == "__TE_MAJOR__":
                 result = '%s' % (__MAJOR)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__TE_MINOR__":
+            if match == "__TE_MINOR__":
                 result = '%s' % (__MINOR)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            if named == "__TEVER__":
+            if match == "__TEVER__":
                 result = '%s' % (__VERSTR,)
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            # This is the custom part, I want to support in place contexts
-            context_name = named.split(".")
-            if len(context_name) <= 1:
-                #No context name in the template
-                #try to use the global context, if there is one
-                if context is not None:
-                    ctx_named = context + "." + named
-                    message("debug", "", "Looking for %s" % ctx_named)
-                    if ctx_named in mapping:
-                        named = ctx_named
+            #explicitly set the context, which means that the gobal context is ignored?
+            match_split = match.split(".")
+            lcontexts = contexts
+            if len(match_split) == 2:
+                lcontext = match_split[1]
+                lcontexts = [lcontext]
+                message("debug", "", "Found embedded context '%s'" % lcontext)
+            else:
+                #No context in the template match
+                #try to use the global contexts, if there is one
+                matches = []
+                message("debug","","Checking contexts %s" % contexts)
+                for context in contexts:
+                    ctx_match =  match + "." + context
+                    message("debug", "", "Looking for %s" % ctx_match)
+                    if ctx_match in mapping:
+                        message("debug", "", "Found %s" % ctx_match)
+                        matches.append(ctx_match)
 
-            val = mapping[named]
-            if val[:2] == "##":
-                file_str = load_subs_file(val[2:],mapping,context)
-                message("debug", "", "Evaluated %s:%s" % (named, file_str))
+                if len(matches) > 1:
+                    raise ValueError('More than 1 replacement found in global context',
+                                     match)
+                if len(matches) == 1:
+                    match = matches[0]
+                    lcontexts = contexts
+
+            val = mapping[match]
+            if val[:2] == "##": #TODO: Allow escaping here
+                new_template = val[2:]
+                message("debug", "", "Recusing on file `%s` with context %s" % (new_template, lcontexts))
+                file_str = load_subs_file(val[2:],mapping,lcontexts)
+                message("debug", "", "Evaluated %s:%s" % (match, file_str))
                 val = file_str
+
+            if "$$" in val: #Allow recursive resolution
+                new_template = val
+                message("debug", "", "Recusing on template %s with context %s" % (new_template, lcontexts))
+                new_val = substitute(new_template,filein,mapping,lcontexts)
+                message("debug", "", "Evaluated %s:%s" % (match, new_val))
+                val = new_val
 
             # We use this idiom instead of str() because the latter will
             # fail if val is a Unicode containing non-ASCII characters.
@@ -211,26 +236,29 @@ def load_temp(t):
     message("debug", None, "Loading template...")
     return load_file(t)
 
-def run_subs(temp, filein, dict, ctxt):
+def run_subs(temp, filein, dict, ctxts):
     message("debug", None, "Doing substitutions...")
     try:
-        result = substitute(temp,filein, dict, ctxt)
+        result = substitute(temp,filein, dict, ctxts)
     except KeyError as e:
         message("error", "string-sub", "Substitution '%s' not found in '%s'." % (e.message, filein))
+    except ValueError as e:
+        message("error", "string-sub", "More than one context for this key %s." % e.message)
+
 
     return result
 
-def load_subs_file(file, dict,context):
+def load_subs_file(file, dict,contexts):
     if os.path.exists(file):
         file_str = load_file(file)
-        return run_subs(file_str,file, dict, context)
+        return run_subs(file_str,file, dict, contexts)
 
     for incl_dir in incl_dirs:
         incl_dir += "/" if incl_dir[-1] != "/" else ""
         file_path = incl_dir + file
         if os.path.exists(file_path):
             file_str = load_file(file_path)
-            return run_subs(file_str,file, dict, context)
+            return run_subs(file_str,file, dict, contexts)
 
     message("warn", "file-not-found", "Include file '%s' not found." % file)
 
@@ -249,9 +277,9 @@ def load_incl(incl,incl_dirs):
     message("error", "file-not-found", "Include file '%s' not found." % incl)
 
 
-def add_value(context,id,val,result,incl_dirs, global_context):
+def add_value(context,id,val,result,incl_dirs):
         if context != None:
-            id = context + "." + id
+            id = id + "." + context
 
         if id in result:
             message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % id)
@@ -259,7 +287,7 @@ def add_value(context,id,val,result,incl_dirs, global_context):
         message("debug", "", "Adding %s:%s" % (id, val))
         result[id] = val
 
-def load_dict(args_incls, args_incl_dirs, args_defs, global_context):
+def load_dict(args_incls, args_incl_dirs, args_defs):
     result = {}
     message("debug", None, "Loading dictonaries...")
     for arg_def in args_defs:
@@ -270,7 +298,7 @@ def load_dict(args_incls, args_incl_dirs, args_defs, global_context):
 
         id = define[0]
         val = "=".join(define[1:])
-        add_value(None, id,val,result, args_incl_dirs, global_context)
+        add_value(None, id,val,result, args_incl_dirs)
 
     for args_incl in args_incls:
         incl = load_incl(args_incl, args_incl_dirs)
@@ -282,9 +310,9 @@ def load_dict(args_incls, args_incl_dirs, args_defs, global_context):
                 ctxt_name = node
                 ctxt_map  = config[node]
                 for ctxt_id in ctxt_map :
-                    add_value(ctxt_name,ctxt_id,ctxt_map[ctxt_id],result,args_incl_dirs, global_context)
+                    add_value(ctxt_name,ctxt_id,ctxt_map[ctxt_id],result,args_incl_dirs)
             else:
-                add_value(None, node,config[node],result, args_incl_dirs, global_context)
+                add_value(None, node,config[node],result, args_incl_dirs)
 
     return result
 
@@ -313,7 +341,7 @@ parser.add_argument("-i", dest='incls', action='append', default=[],
                     help='One or more JSON dictionaries defining insertions/replacements map')
 parser.add_argument('-I', dest='incl_dirs', action='append', default=[],
                     help='Direcotry to look in for inclusions')
-parser.add_argument('-C', dest='ctxt', action='store', default=None,
+parser.add_argument('-C', dest='ctxts', action='append', default=[],
                     help='Use the given context from the dictionary file(s)')
 parser.add_argument('-W', dest='warnings', action='append', default=[],
                     help='Configure warnings. -Werror, -Wno-overwrite, -Wno-overwrite-context, -Wno-file-not-found, -Wno-define-fail')
@@ -347,7 +375,7 @@ template_file = args.temp
 incl_dirs     = args.incl_dirs
 out_file      = args.out
 
-dict      = load_dict(args.incls, args.incl_dirs, args.defs, args.ctxt)
+dict      = load_dict(args.incls, args.incl_dirs, args.defs)
 template  = load_temp(args.temp)
-result    = run_subs(template, args.temp, dict, args.ctxt)
+result    = run_subs(template, args.temp, dict, args.ctxts)
 write_out(result, args.out)

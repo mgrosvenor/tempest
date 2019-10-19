@@ -135,12 +135,16 @@ My name is mgrosvnor
 
 Context information can also be added inline, for example
 ```
-My name is $$online.name
+My real name is $$name.real
+My online name is $$name.online
+
 ```
 
 While compiling with `tempest tempalte.txt -i config.json` produces:
 ```
-My name is mgrosvnor
+My real name is Matthew
+My online name is mgrosvnor
+
 ```
 
 ## Builtins
@@ -153,10 +157,10 @@ The output file name as given by the -o "out" command line
 The current file name that the template engine is working on (e.g. from includes)
 
 `$$__TEMPLATE__`
-The template name that the engine is working on on
+The template name that the engine is working on, given by the input argument TEMPLATE
 
 `$$__DICTS__`
-Sources of dictionaries for the template engine
+Sources of dictionaries for the template engine (e.g. -i)
 
 `$$__FILES__`
 Sources of files for this compilation
