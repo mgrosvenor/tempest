@@ -15,8 +15,18 @@ DESCRIPTION
 
 Tempest is a really ridiculously stupidly simple template engine.
 It is designed to make it easy to build complex text files using simple templates.
-Tempest templates have only two options 1) replace a string or 2) insert a file contents.
-Data for populating the templates is supplied in a simple flat JSON file and/or command line arguments.
+Tempest templates have only two options 1) replace a string or 2) insert a file.
+String replacement or insertion can be performed in a given "context", which can be specified either on the command line, or inline.
+It turns out that string replacement, within a context, turns out to be a simple, but powerful way to construct large text files (like web pages).
+Data for populating the templates is supplied in a simple JSON file and/or command line arguments.
+The Temest command line is made to mimic the GNU (and Clang) C compilers.
+This makes it easy and natural to integrate into Makefile based building.
+The result is a fast, minimal and efficient web framework, effectively based on 4 files:
+
+1.  the Tempest engine (text/python)
+2.  the Makefile (text/GNU Make)
+3.  the configuration file (text/JSON)
+4.  the HTML template (text/html)
 
 Options
 -------
