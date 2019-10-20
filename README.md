@@ -83,9 +83,9 @@ If the substitution pattern is contained in another string (e.g. "$$names") then
 Replacement is lazy, so replacement strings can be contained in the JSON file, as long as the replacement string is defined at the time of evaluation. e.g. The following configuration is valid:
 ```
 {
+    "full_name": "$$first_name $$last_name",
     "first_name":"Matthew",
-    "last_name":"Grosvenor",
-    "full_name": "$$first_name $$last_name" 
+    "last_name":"Grosvenor"
 }
 ```
 
