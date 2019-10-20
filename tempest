@@ -157,21 +157,15 @@ def substitute(template,filein,mapping,contexts):
             else:
                 #No context in the template match
                 #try to use the global contexts, if there is one
-                matches = []
                 message("debug","","Checking contexts %s" % contexts)
                 for context in contexts:
                     ctx_match =  match + "." + context
                     message("debug", "", "Looking for %s" % ctx_match)
                     if ctx_match in mapping:
                         message("debug", "", "Found %s" % ctx_match)
-                        matches.append(ctx_match)
-
-                if len(matches) > 1:
-                    raise ValueError('More than 1 replacement found in global context',
-                                     match)
-                if len(matches) == 1:
-                    match = matches[0]
-                    lcontexts = contexts
+                        match = ctx_match
+                        lcontexts = contexts
+                        break                    
 
             val = mapping[match]
             if val[:2] == "##": #TODO: Allow escaping here
