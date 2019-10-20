@@ -17,7 +17,7 @@ Tempest is a really ridiculously stupidly simple template engine.
 It is designed to make it easy to build complex text files using simple templates.
 Tempest templates have only two options 1) replace a string or 2) insert a file.
 String replacement or insertion can be performed in a given "context", which can be specified either on the command line, or inline.
-It turns out that string replacement, within a context, turns out to be a simple, but powerful way to construct large text files (like web pages).
+String replacement, within a context, turns out to be a simple, but powerful way to construct large text files (like web pages).
 Data for populating the templates is supplied in a simple JSON file and/or command line arguments.
 
 Options
