@@ -41,7 +41,7 @@ solve this issue.
 """
 
 delimiter = '$$'
-idpattern = r'[_a-z][_\-a-z0-9]*\.[_a-z][_\-a-z0-9]*|[_a-z][_\-a-z0-9]*'
+idpattern = r'[_a-z][_\.\-a-z0-9]*[_a-z][_\-a-z0-9]* | [_a-z][_\-a-z0-9]*'
 pattern = r"""
 %(delim)s(?:
   (?P<escaped>%(delim)s) |   # Escape sequence of two delimiters
@@ -73,7 +73,8 @@ dicts           = []
 template_file   = ""
 incl_dirs       = []
 out_file        = ""
-def substitute(template,filein,mapping,contexts):
+contexts        = []
+def substitute(template,filein,mapping, ctxts ):
 
     # Helper function for .sub()
     def convert(mo):
@@ -147,27 +148,31 @@ def substitute(template,filein,mapping,contexts):
                 message("debug", "", "Returning '%s'" % result)
                 return result
 
-            #explicitly set the context, which means that the gobal context is ignored?
+            #check for context preferrence
+            val = None
+            pcontexts = []
             match_split = match.split(".")
-            lcontexts = contexts
-            if len(match_split) == 2:
-                lcontext = match_split[1]
-                lcontexts = [lcontext]
-                message("debug", "", "Found embedded context '%s'" % lcontext)
-            else:
-                #No context in the template match
-                #try to use the global contexts, if there is one
-                message("debug","","Checking contexts %s" % contexts)
-                for context in contexts:
-                    ctx_match =  match + "." + context
-                    message("debug", "", "Looking for %s" % ctx_match)
-                    if ctx_match in mapping:
-                        message("debug", "", "Found %s" % ctx_match)
-                        match = ctx_match
-                        lcontexts = contexts
-                        break
+            if len(match_split) > 1:
+                pcontexts = match_split[1:]
+                match = match_split[0]
+                message("debug","", "Found preferred contexts '%s'" % pcontexts)
+
+            lcontexts = pcontexts + ctxts
+            #No context in the template match, use the supplied contexts instead
+            message("debug","","Checking contexts %s" % lcontexts)
+
+            for context in lcontexts:
+                ctx_match =  match + "." + context
+                message("debug", "", "Looking for %s" % ctx_match)
+                if ctx_match in mapping:
+                    message("debug", "", "Found %s" % ctx_match)
+                    if len(match_split) > 1 and context not in pcontexts:
+                        message("warn","not-preferred","Match for %s found in non-preferred context %s", match, content)
+                    match = ctx_match
+                    break
 
             val = mapping[match]
+
             if val[:2] == "##": #TODO: Allow escaping here
                 new_template = val[2:]
                 message("debug", "", "Recusing on file `%s` with context %s" % (new_template, lcontexts))
@@ -208,7 +213,7 @@ def message(type, err_code, text):
         sys.stderr.write("Error (%s): %s Terminating.\n" % (err_code, text))
         sys.exit(-1)
     elif type == "warn":
-        if ("no-" + err_code) in args.warnings:
+        if ("no-" + err_code) in args.warnings or "all" not in args.warnings:
             return
         sys.stderr.write("Warning (%s): %s\n" % (err_code,text))
     elif type == "debug":
@@ -230,11 +235,18 @@ def load_temp(t):
     message("debug", None, "Loading template...")
     return load_file(t)
 
-def run_subs(temp, filein, dict, ctxts):
+def run_subs(temp, filein, dict, contexts):
     message("debug", None, "Doing substitutions...")
     try:
-        result = substitute(temp,filein, dict, ctxts)
+        result = substitute(temp,filein, dict, contexts)
     except KeyError as e:
+        if args.verbose:
+            keys = dict.keys()
+            keys.sort(key = lambda l:( l.split(".")[1],  l.split(".")[0] ))
+            for k in keys:
+                name,context = k.split(".")
+                print "%-25s [%-15s] --> %-10s" % (name, context, dict[k])
+
         message("error", "string-sub", "Substitution '%s' not found in '%s'." % (e.message, filein))
     except ValueError as e:
         message("error", "string-sub", "More than one context for this key %s." % e.message)
@@ -292,7 +304,7 @@ def load_dict(args_incls, args_incl_dirs, args_defs):
 
         id = define[0]
         val = "=".join(define[1:])
-        add_value(None, id,val,result, args_incl_dirs)
+        add_value("CMDLN", id,val,result, args_incl_dirs)
 
     for args_incl in args_incls:
         incl = load_incl(args_incl, args_incl_dirs)
@@ -306,7 +318,7 @@ def load_dict(args_incls, args_incl_dirs, args_defs):
                 for ctxt_id in ctxt_map :
                     add_value(ctxt_name,ctxt_id,ctxt_map[ctxt_id],result,args_incl_dirs)
             else:
-                add_value(None, node,config[node],result, args_incl_dirs)
+                add_value("GLOBAL", node,config[node],result, args_incl_dirs)
 
     return result
 
@@ -338,7 +350,7 @@ parser.add_argument('-I', dest='incl_dirs', action='append', default=[],
 parser.add_argument('-C', dest='ctxts', action='append', default=[],
                     help='Use the given context from the dictionary file(s)')
 parser.add_argument('-W', dest='warnings', action='append', default=[],
-                    help='Configure warnings. -Werror, -Wno-overwrite, -Wno-overwrite-context, -Wno-file-not-found, -Wno-define-fail')
+                    help='Configure warnings. -Wall, -Werror, -Wno-overwrite, -Wno-overwrite-context, -Wno-file-not-found, -Wno-define-fail')
 parser.add_argument('-o', dest='out', action='store',
                     help='Output file')
 parser.add_argument('-v', "--version", dest='version', action='store_const', const=1,
@@ -371,5 +383,6 @@ out_file      = args.out
 
 dict      = load_dict(args.incls, args.incl_dirs, args.defs)
 template  = load_temp(args.temp)
-result    = run_subs(template, args.temp, dict, args.ctxts)
+contexts  = args.ctxts + ["CMDLN", "GLOBAL"]
+result    = run_subs(template, args.temp, dict, contexts)
 write_out(result, args.out)
