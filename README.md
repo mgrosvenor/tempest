@@ -191,6 +191,9 @@ TODO
 - It would be nice to have "macro" functions of the form `$$my_func(a,b)` which would allow more complex insertions.
 - It would be nice to have `-E-no-xxx` error overrides in the same way as `-W-no-xxx`
 - Need to think through a more principled approach to contexts. How do explicit inline contexts play with command line contexts? Additive? Exclusive? Something else? How would they interoperate with macros?
+- Nicer error handling for JSON errors would be good.
+- Also relaxing JSON pedantry would be nice.
+- Should file inclusions be allowed directly from the template text?
 
 BUGS
 ====
