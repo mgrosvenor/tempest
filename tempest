@@ -167,7 +167,7 @@ def substitute(template,filein,mapping, ctxts ):
                 if ctx_match in mapping:
                     message("debug", "", "Found %s" % ctx_match)
                     if len(match_split) > 1 and context not in pcontexts:
-                        message("warn","not-preferred","Match for %s found in non-preferred context %s", match, content)
+                        message("warn","not-preferred","Match for %s found in non-preferred context %s" % (match, context))
                     match = ctx_match
                     break
 
