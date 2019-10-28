@@ -185,6 +185,12 @@ Minor version number of the template engine
 `$$__TEVER__`
 Version string for the template engine
 
+TODO
+====
+- It would be nice if file insertions retained whitespace indentation
+- It would be nice to have "macro" functions of the form `$$my_func(a,b)` which would allow more complex insertions.
+- It would be nice to have `-E-no-xxx` error overrides in the same way as `-W-no-xxx`
+- Need to think through a more principled approach to contexts. How do explicit inline contexts play with command line contexts? Additive? Exclusive? Something else? How would they interoperate with macros?
 
 BUGS
 ====
