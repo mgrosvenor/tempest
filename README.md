@@ -3,12 +3,12 @@
 NAME
 ====
 
-**tempest** — performs template substitutions.  
+**tempest** — Tempest template engine
 
 SYNOPSIS
 ========
 
-| **tempest** TEMPLATE [-D DEFS]  [-i INCLS] [-I INCL_DIRS] [-C CTXTS] [-o OUT] [-W WARN] [-h]
+| **tempest** TEMPLATE [-D DEFS]  [-d DICTS] [-I INCL_DIRS] [-C CTXTS] [-o OUT] [-W WARN] [-h]
 
 DESCRIPTION
 ===========
@@ -17,6 +17,9 @@ Tempest is a really ridiculously stupidly simple template engine.
 It is designed to make it easy to build complex text files using simple templates.
 Tempest templates have only two options 1) replace a string or 2) insert a file.
 String replacement or insertion can be performed in a given "context", which can be specified either on the command line, or inline.
+A context allows the dictionary file to hold many configurations.
+Contexts can also be lists, which allows the same file insertion to be repeated e.g. for building lists and tables.
+
 String replacement, within a context, turns out to be a simple, but powerful way to construct large text files (like web pages).
 Data for populating the templates is supplied in a simple JSON file and/or command line arguments.
 
