@@ -40,7 +40,7 @@ def message(type, err_code, text):
     elif type == "error" or (type == "warn" and "error" in args.warnings):
         if type == "warn" and ("no-" + err_code) in args.warnings:
             return
-        sys.stderr.write("Error (%s): %s Terminating.\n" % (err_code, text))
+        sys.stderr.write("Error (%s): %s\nTerminating.\n" % (err_code, text))
         sys.exit(-1)
     elif type == "warn":
         if ("no-" + err_code) in args.warnings or "all" not in args.warnings:
@@ -52,6 +52,20 @@ def message(type, err_code, text):
     else:
         message("error", "internal", "Unknown print message type '%s'." % type)
 
+
+def template_err(mo, mo_str,template, short, long):
+    i = mo.start(mo_str)
+    lines = template[:i].splitlines(True)
+    if not lines:
+        colno = 1
+        lineno = 1
+    else:
+        colno = i - len(''.join(lines[:-1]))
+        lineno = len(lines)
+    line = template.splitlines(True)[lineno-1][:-1]
+    dashes = "-" * (colno)
+    message("error", short, "%s: line %d, col %d\n%s\n%s^\n" %
+            (long,lineno,colno,line,dashes) )
 
 
 ################################################################################
@@ -83,17 +97,6 @@ pattern = pattern % {
     }
 pattern = re.compile(pattern, re.IGNORECASE | re.VERBOSE)
 
-def _invalid(mo,template):
-    i = mo.start('invalid')
-    lines = template[:i].splitlines(True)
-    if not lines:
-        colno = 1
-        lineno = 1
-    else:
-        colno = i - len(''.join(lines[:-1]))
-        lineno = len(lines)
-    raise ValueError('Invalid placeholder in string: line %d, col %d' %
-                     (lineno, colno))
 
 
 files           = []
@@ -203,6 +206,7 @@ def load_incl_file(key,dict,wsp):
                 #Overwriting is allowed (and expected) here because we will have
                 #a list of contexts with the same key --> value mappings
                 add_kvp(key,ctxt[key],dict,True)
+                add_kvp("__LIDX__", "%i" % i, dict, True )
 
             message("debug","","Running substitution numbrer %i on file %s" % (i, file_name))
             result += load_subs_file(file_name,dict,wsp)
@@ -238,6 +242,12 @@ def substitute(template,filein,dict,wspin):
             if result is not None:
                 return result
 
+            if key not in dict:
+                if mo.group('named') is not None:
+                    template_err(mo,'named',template,"key-not-found","Key '%s' not found" % key)
+                else:
+                    template_err(mo,'braced',template,"key-not-found","Key '%s' not found" % key)
+
             val = dict[key]
 
             if delimiter in val: #peform recursive resolution
@@ -255,9 +265,10 @@ def substitute(template,filein,dict,wspin):
         if mo.group('escaped') is not None:
             return delimiter
         if mo.group('invalid') is not None:
-            _invalid(mo,template)
+            template_err(mo,'invalid',template,"key-error","Invlaid or poorly formated key")
 
-        message("error","not-found","Pattern name '%s' not found" % match)
+
+        message("error","","Pattern name '%s' not found" % key)
         #raise ValueError('Unrecognized named group in pattern', pattern)
 
     return pattern.sub(convert, template)
