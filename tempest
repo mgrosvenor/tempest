@@ -21,6 +21,7 @@ from collections import OrderedDict
 import re
 import datetime
 import traceback
+import codecs
 
 __MAJOR = 2
 __MINOR = 0
@@ -81,7 +82,7 @@ solve this issue.
 """
 
 delimiter = '$$'
-idpattern = r'[_a-zA-Z]*[_\.\-a-zA-Z0-9]*\>[_\-a-zA-Z][_/\.\-a-zA-Z0-9]*|[_a-zA-Z][_\-a-zA-Z0-9]*'
+idpattern = r'[_a-zA-Z]*[_\.\-a-zA-Z0-9]*\>[_\-a-zA-Z][_/\.\-a-zA-Z0-9]*|[_a-zA-Z][_\-a-zA-Z0-9]*|\#[_a-zA-Z]*[_\.\-a-zA-Z0-9]*\>[_\-a-zA-Z][_/\.\-a-zA-Z0-9]*|\#[_a-zA-Z][_\-a-zA-Z0-9]*'
 #(?P<white>[ \t\r\f\v]*)
 pattern = r"""
 %(delim)s(?:
@@ -173,7 +174,7 @@ def builtins(key,filein):
 
     return None
 
-def load_incl_file(key,dict,wsp):
+def load_incl_file(key,dict,wsp,allow_lookup_miss):
     if ">" in key:
         keys = key.split(">")
         if keys[0] == '':
@@ -193,15 +194,21 @@ def load_incl_file(key,dict,wsp):
         list_ctxt_key = keys[0]
         message("debug", "", "List context key found key='%s' filename='%s'" % (list_ctxt_key,file_name))
         if not list_ctxt_key in dict:
+            if allow_lookup_miss:
+                return ""
             message("error","list-ctxt-key","List context key '%s' not found in dictoary" % list_ctxt_key)
 
         list_ctxt = dict[list_ctxt_key]
+        if type(list_ctxt) != type([]):
+            #Fake up a list if only a single variable is supplied
+            list_ctxt = [{list_ctxt_key:list_ctxt}]
+
         message("debug","","List context found with key=%s and %i contexts. Processing..." % (list_ctxt_key,len(list_ctxt)))
         i = 0
         result = ""
         for ctxt in list_ctxt:
             i += 1
-            message("debug","","Laoding context number %i from list" % i)
+            message("debug","","Loading context number %i from list" % i)
             for key in ctxt:
                 #Overwriting is allowed (and expected) here because we will have
                 #a list of contexts with the same key --> value mappings
@@ -211,6 +218,13 @@ def load_incl_file(key,dict,wsp):
             message("debug","","Running substitution numbrer %i on file %s" % (i, file_name))
             result += load_subs_file(file_name,dict,wsp)
             result += "\n"
+
+            for key in ctxt:
+                #Remove old definitions once used
+                del_kvp(key,dict)
+
+        #Set this back to a known state once finished
+        add_kvp("__LIDX__","0",dict,True)
 
         message("debug","",result)
         return result
@@ -230,29 +244,36 @@ def substitute(template,filein,dict,wspin):
         wsp = wspin
         message("debug", "", "Found new key '%s'" % key)
         if key is not None:
-            files.append(filein)
 
             #Check first if the key is a builtin
             result = builtins(key,filein)
             if result is not None:
                 return result
 
+            allow_lookup_miss = False
+            if key[0] == "#":
+                key = key[1:]
+                allow_lookup_miss = True
+
             #Specail case, check if the key is itself a file inclusion
-            result = load_incl_file(key,dict,wsp)
+            result = load_incl_file(key,dict,wsp,allow_lookup_miss)
             if result is not None:
                 return result
 
             if key not in dict:
+                if allow_lookup_miss:
+                    return ""
                 if mo.group('named') is not None:
-                    template_err(mo,'named',template,"key-not-found","Key '%s' not found" % key)
+                    template_err(mo,'named',template,"key-not-found","Key '%s' not found in '%s'" % (key,filein))
                 else:
-                    template_err(mo,'braced',template,"key-not-found","Key '%s' not found" % key)
+                    template_err(mo,'braced',template,"key-not-found","Key '%s' not found in '%s'" % (key,filein))
 
             val = dict[key]
+            files.append(filein)
 
             if delimiter in val: #peform recursive resolution
                 new_template = val
-                message("debug", "", "Recusing on template %s" % new_template)
+                message("debug", "", "Recursing on template %s" % new_template)
                 result = substitute(new_template,filein,dict, wsp)
                 return result
 
@@ -301,7 +322,8 @@ def load_file(f):
     if not os.path.exists(f):
         message("error", "file-not-found", "File '%s' not found." % f)
 
-    f = open(f,"r")
+    #f = open(f,"r")
+    f = codecs.open(f, encoding='utf-8')
     result = f.read()
     f.close()
     return result
@@ -322,7 +344,8 @@ def load_subs_file(file,dict,wsp):
             file_str = load_file(file_path)
             return run_subs(file_str,file, dict,wsp)
 
-    message("warn", "file-not-found", "Include file '%s' not found." % file)
+    message("error", "file-not-found", "Include file '%s' not found." % file)
+    return ""
 
 def load_dict_file(dict_file,incl_dirs):
     if os.path.exists(dict_file):
@@ -340,25 +363,23 @@ def load_dict_file(dict_file,incl_dirs):
 
 
 def add_kvp(key,val,dict,overwrite):
-        if not overwrite and key in dict:
-            message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % key)
+    if key[0] == "!":
+        overwrite = True
+        key = key[1:]
 
-        message("debug", "", "Adding key %s --> '%s'" % (key, val))
-        dict[key] = val
+    if not overwrite and key in dict:
+        message("warn", "overwrite", "Identifer '%s' already defined. Overwriting." % key)
+
+    message("debug", "", "Adding key %s --> '%s'" % (key, val))
+    dict[key] = val
+
+def del_kvp(key,dict):
+    message("debug", "", "Removing key %s from dictionary" % key)
+    del dict[key]
+
 
 def load_dicts(args_kvp_defs, args_dict_files, args_incl_dirs, args_ctxts):
     result = {}
-    message("debug", None, "Parsing command line definitions...")
-    for kvp_def in args_kvp_defs:
-        define = kvp_def.split("=")
-        if len(define) < 2:
-            message("warn", "define-fail", "Definition failure '%s'. Definitions must be in the form key=value." % args_defs)
-            continue
-
-        key = define[0]
-        val = "=".join(define[1:])
-        add_kvp(key,val,result,False)
-
     message("debug", None, "Loading dictonary files...")
     for dict_file in args_dict_files:
         dict = load_dict_file(dict_file, args_incl_dirs)
@@ -380,6 +401,20 @@ def load_dicts(args_kvp_defs, args_dict_files, args_incl_dirs, args_ctxts):
             else:
                 add_kvp(node,dict[node],result,False)
 
+    #This is a special case. Make sure the list index is defined always, even
+    #if not processing inside a list
+    add_kvp("__LIDX__","0",result,False)
+
+    message("debug", None, "Parsing command line definitions...")
+    for kvp_def in args_kvp_defs:
+        define = kvp_def.split("=")
+        if len(define) < 2:
+            message("warn", "define-fail", "Definition failure '%s'. Definitions must be in the form key=value." % args_defs)
+            continue
+        key = define[0]
+        val = "=".join(define[1:])
+        add_kvp(key,val,result,False)
+
     return result
 
 
@@ -389,7 +424,7 @@ def write_out(result, args_out):
     else:
         message("debug", None, "Saving output...")
         message("debug", None, "  Writing to '%s'..." % args_out )
-        out = open(args_out,"w")
+        out = codecs.open(args_out, encoding='utf-8', mode='w+')
     out.write(result)
     out.close()
     return
